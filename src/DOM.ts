@@ -131,15 +131,20 @@ export function handleMessageNode(node: HTMLElement, adWords: string[]): void {
   }, []);
   if (!textContent && !links.length) { return; }
 
+  // Find which keyword matched
+  let matchedKeyword: string | null = null;
   const filters = adWords.map((filter) => filter.toLowerCase());
-  const hasMatch = filters.some((filter) =>
-    textContent?.includes(filter) || links.some((href) => href.includes(filter))
-  );
-  if (!hasMatch) { return; }
+  for (const filter of filters) {
+    if (textContent?.includes(filter) || links.some((href) => href.includes(filter))) {
+      matchedKeyword = adWords.find(word => word.toLowerCase() === filter) || null;
+      break;
+    }
+  }
+  if (!matchedKeyword) { return; }
 
   const trigger = document.createElement("div");
   trigger.classList.add("advertisement");
-  trigger.textContent = "Hidden by filter";
+  trigger.textContent = `Hidden by filter for <${matchedKeyword}>`;
   node.querySelector(".bubble-content")?.prepend(trigger);
 
   node.classList.add("has-advertisement");

@@ -140,10 +140,21 @@ function handleMessageNode(node, adWords) {
 		return acc;
 	}, []);
 	if (!textContent && !links.length) return;
-	if (!adWords.map((filter) => filter.toLowerCase()).some((filter) => textContent?.includes(filter) || links.some((href) => href.includes(filter)))) return;
+	
+	// Find which keyword matched
+	let matchedKeyword = null;
+	const filters = adWords.map((filter) => filter.toLowerCase());
+	for (const filter of filters) {
+		if (textContent?.includes(filter) || links.some((href) => href.includes(filter))) {
+			matchedKeyword = adWords.find(word => word.toLowerCase() === filter);
+			break;
+		}
+	}
+	if (!matchedKeyword) return;
+	
 	const trigger = document.createElement("div");
 	trigger.classList.add("advertisement");
-	trigger.textContent = "Hidden by filter";
+	trigger.textContent = `Hidden by filter for <${matchedKeyword}>`;
 	node.querySelector(".bubble-content")?.prepend(trigger);
 	node.classList.add("has-advertisement");
 	trigger.addEventListener("click", () => {
