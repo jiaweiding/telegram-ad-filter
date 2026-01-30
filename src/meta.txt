@@ -7,6 +7,7 @@
 // @icon         https://web.telegram.org/favicon.ico
 // @namespace    telegram-ad-filter
 // @match        https://web.telegram.org/k/*
+// @match        https://web.telegram.org/a/*
 // @require      https://openuserjs.org/src/libs/sizzle/GM_config.js
 // @grant        GM_addStyle
 // @grant        GM_getValue

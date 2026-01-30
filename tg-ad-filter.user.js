@@ -7,15 +7,16 @@
 // @icon         https://web.telegram.org/favicon.ico
 // @namespace    telegram-ad-filter
 // @match        https://web.telegram.org/k/*
+// @match        https://web.telegram.org/a/*
 // @require      https://openuserjs.org/src/libs/sizzle/GM_config.js
 // @grant        GM_addStyle
 // @grant        GM_getValue
 // @grant        GM_setValue
-// @homepage     https://github.com/VChet/telegram-ad-filter
-// @homepageURL  https://github.com/VChet/telegram-ad-filter
-// @supportURL   https://github.com/VChet/telegram-ad-filter
-// @updateURL    https://github.com/VChet/telegram-ad-filter/raw/master/tg-ad-filter.user.js
-// @downloadURL  https://github.com/VChet/telegram-ad-filter/raw/master/tg-ad-filter.user.js
+// @homepage     https://github.com/jiaweiding/telegram-ad-filter
+// @homepageURL  https://github.com/jiaweiding/telegram-ad-filter
+// @supportURL   https://github.com/jiaweiding/telegram-ad-filter
+// @updateURL    https://github.com/jiaweiding/telegram-ad-filter/raw/master/tg-ad-filter.user.js
+// @downloadURL  https://github.com/jiaweiding/telegram-ad-filter/raw/master/tg-ad-filter.user.js
 // ==/UserScript==
 
 /* jshint esversion: 11 */
@@ -163,7 +164,7 @@ const settingsConfig = {
 	fields: { listUrls: {
 		label: "Blacklist URLs (one per line) – each URL must be a publicly accessible JSON file containing an array of blocked words or phrases",
 		type: "textarea",
-		default: "https://raw.githubusercontent.com/VChet/telegram-ad-filter/master/blacklist.json"
+		default: "https://raw.githubusercontent.com/jiaweiding/telegram-ad-filter/refs/heads/master/blacklist.json"
 	} }
 };
 
@@ -209,7 +210,6 @@ async function fetchLists(urlsString) {
 	return [...resultSet];
 }
 
-//#endregion
 //#region src/main.ts
 (async () => {
 	GM_addStyle(globalStyles);
@@ -218,7 +218,12 @@ async function fetchLists(urlsString) {
 		...settingsConfig,
 		events: {
 			init: async function() {
-				adWords = await fetchLists(this.get("listUrls").toString());
+				try {
+					adWords = await fetchLists(this.get("listUrls").toString());
+					console.log("[TG Ad Filter] Loaded", adWords.length, "keywords");
+				} catch (error) {
+					console.error("[TG Ad Filter] Failed to load blacklist:", error);
+				}
 			},
 			save: async function() {
 				try {
