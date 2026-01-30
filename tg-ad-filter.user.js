@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Telegram Ad Filter
-// @version      1.4.2
-// @description  Collapses messages that contain words from the ad-word list
+// @version      1.5.0
+// @description  Removes official Telegram sponsored messages and collapses messages that contain words from the ad-word list
 // @license      MIT
 // @author       VChet
 // @icon         https://web.telegram.org/favicon.ico
@@ -27,6 +27,11 @@ const globalStyles = `
   .bubble.has-advertisement .bubble-content *:not(.advertisement),
   .bubble.has-advertisement .reply-markup {
     display: none;
+  }
+  .bubble.is-sponsored,
+  .bubble[data-is-sponsored="true"],
+  .sponsored-message {
+    display: none !important;
   }
   .advertisement {
     padding: 0.5rem 1rem;
@@ -92,9 +97,42 @@ function addSettingsButton(element, callback) {
 	});
 	element.append(settingsButton);
 }
+function handleSponsoredMessage(node) {
+	// Check for various indicators of official Telegram sponsored messages
+	if (node.classList.contains("is-sponsored")) {
+		return true;
+	}
+	if (node.hasAttribute("data-is-sponsored")) {
+		return true;
+	}
+	if (node.classList.contains("sponsored-message")) {
+		return true;
+	}
+	// Check for "Sponsored" text in message
+	const sponsoredLabel = node.querySelector(".sponsored-label, .sponsor-label, [class*=\"sponsor\"]");
+	if (sponsoredLabel && sponsoredLabel.textContent?.toLowerCase().includes("sponsor")) {
+		return true;
+	}
+	// Check message content for sponsored indicators
+	const message = node.querySelector(".message");
+	if (message) {
+		const messageText = message.textContent?.toLowerCase() || "";
+		// Look for common sponsored message patterns
+		if (messageText.includes("sponsored") && node.querySelector(".bubble-content-wrapper")) {
+			return true;
+		}
+	}
+	return false;
+}
 function handleMessageNode(node, adWords) {
 	const message = node.querySelector(".message");
 	if (!message || node.querySelector(".advertisement")) return;
+	// First check if this is an official sponsored message
+	if (handleSponsoredMessage(node)) {
+		node.classList.add("is-sponsored");
+		node.setAttribute("data-is-sponsored", "true");
+		return;
+	}
 	const textContent = message.textContent?.toLowerCase();
 	const links = [...message.querySelectorAll("a")].reduce((acc, { href }) => {
 		if (href) acc.push(href.toLowerCase());

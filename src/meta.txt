@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Telegram Ad Filter
-// @version      1.4.2
-// @description  Collapses messages that contain words from the ad-word list
+// @version      1.5.0
+// @description  Removes official Telegram sponsored messages and collapses messages that contain words from the ad-word list
 // @license      MIT
 // @author       VChet
 // @icon         https://web.telegram.org/favicon.ico
