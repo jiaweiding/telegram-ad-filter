@@ -24,8 +24,23 @@
 
 //#region src/DOM.ts
 const globalStyles = `
-  .bubble:not(.has-advertisement) .advertisement,
-  .bubble.has-advertisement .bubble-content *:not(.advertisement),
+  .bubble:not(.has-advertisement) .advertisement {
+    display: none;
+  }
+  .bubble.has-advertisement .bubble-content {
+    min-height: auto !important;
+  }
+  .bubble.has-advertisement .bubble-content *:not(.advertisement) {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
   .bubble.has-advertisement .reply-markup {
     display: none;
   }
