@@ -42,7 +42,7 @@ const globalStyles = `
     border: 0;
   }
   .bubble.has-advertisement .reply-markup {
-    display: none;
+    display: none !important;
   }
   .bubble.is-sponsored,
   .bubble[data-is-sponsored="true"],
@@ -50,6 +50,7 @@ const globalStyles = `
     display: none !important;
   }
   .advertisement {
+    display: block !important;
     padding: 0.5rem 1rem;
     cursor: pointer;
     white-space: nowrap;
