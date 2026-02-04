@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         Telegram Ad Filter
-// @version      1.5.0
-// @description  Removes official Telegram sponsored messages and collapses messages that contain words from the ad-word list
+// @name         Telegram Ad Filter (Read-safe)
+// @version      1.5.1
+// @description  Removes official Telegram sponsored messages and hides keyword-based ads without breaking read status
 // @license      MIT
 // @author       VChet
 // @icon         https://web.telegram.org/favicon.ico
@@ -12,287 +12,191 @@
 // @grant        GM_addStyle
 // @grant        GM_getValue
 // @grant        GM_setValue
-// @homepage     https://github.com/jiaweiding/telegram-ad-filter
-// @homepageURL  https://github.com/jiaweiding/telegram-ad-filter
-// @supportURL   https://github.com/jiaweiding/telegram-ad-filter
-// @updateURL    https://github.com/jiaweiding/telegram-ad-filter/raw/master/tg-ad-filter.user.js
-// @downloadURL  https://github.com/jiaweiding/telegram-ad-filter/raw/master/tg-ad-filter.user.js
 // ==/UserScript==
 
 /* jshint esversion: 11 */
 
-
-//#region src/DOM.ts
 const globalStyles = `
-  .bubble:not(.has-advertisement) .advertisement {
-    display: none;
-  }
-  .bubble.has-advertisement .bubble-content {
-    min-height: auto !important;
-  }
-  .bubble.has-advertisement .bubble-content *:not(.advertisement) {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    padding: 0;
-    margin: -1px;
-    overflow: hidden;
-    clip: rect(0, 0, 0, 0);
-    white-space: nowrap;
-    border: 0;
-  }
-  .bubble.has-advertisement .reply-markup {
-    display: none !important;
-  }
-  .bubble.is-sponsored,
-  .bubble[data-is-sponsored="true"],
-  .sponsored-message {
-    display: none !important;
-  }
-  .advertisement {
-    display: block !important;
-    padding: 0.5rem 1rem;
-    cursor: pointer;
-    white-space: nowrap;
-    font-style: italic;
-    font-size: var(--messages-text-size);
-    font-weight: var(--font-weight-bold);
-    color: var(--link-color);
-  }
-  #telegram-ad-filter-settings {
-    display: inline-flex;
-    justify-content: center;
-    width: 24px;
-    font-size: 24px;
-    color: transparent;
-    text-shadow: 0 0 var(--secondary-text-color);
-  }
+/* 官方 Sponsored 直接移除 */
+.bubble.is-sponsored,
+.bubble[data-is-sponsored="true"],
+.sponsored-message {
+  display: none !important;
+}
+
+/* 命中关键词广告时，隐藏图片 / 视频 */
+.bubble.has-advertisement .attachment {
+  display: none;
+}
+
+/* 隐藏正文（你之前已经有，可以保留） */
+.bubble.has-advertisement .message {
+  display: none;
+}
+
+/* 隐藏评论入口（Leave a comment） */
+.bubble.has-advertisement replies-element.replies-footer {
+  display: none;
+}
+
+/* 隐藏转发按钮 */
+.bubble.has-advertisement .bubble-beside-button.forward {
+  display: none;
+}
+
+/* 提示条 */
+.advertisement {
+  opacity: 0.7;
+  font-size: 0.9em;
+  display: block;
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+  white-space: nowrap;
+  font-style: italic;
+  font-weight: var(--font-weight-bold);
+  color: var(--secondary-text-color);
+}
 `;
+
 const frameStyle = `
   inset: 115px auto auto 130px;
   border: 1px solid rgb(0, 0, 0);
   height: 300px;
-  margin: 0px;
   max-height: 95%;
   max-width: 95%;
-  opacity: 1;
-  overflow: auto;
-  padding: 0px;
   position: fixed;
   width: 75%;
   z-index: 9999;
-  display: block;
 `;
+
 const popupStyle = `
-  #telegram-ad-filter {
-    background: #181818;
-    color: #ffffff;
-  }
-  #telegram-ad-filter textarea {
-    resize: vertical;
-    width: 100%;
-    min-height: 150px;
-  }
-  #telegram-ad-filter .reset, #telegram-ad-filter .reset a, #telegram-ad-filter_buttons_holder {
-    color: inherit;
-  }
+#telegram-ad-filter {
+  background: #181818;
+  color: #ffffff;
+}
+#telegram-ad-filter textarea {
+  resize: vertical;
+  width: 100%;
+  min-height: 150px;
+}
 `;
-function addSettingsButton(element, callback) {
-	const settingsButton = document.createElement("button");
-	settingsButton.classList.add("btn-icon", "rp");
-	settingsButton.setAttribute("title", "Telegram Ad Filter Settings");
-	const ripple = document.createElement("div");
-	ripple.classList.add("c-ripple");
-	const icon = document.createElement("span");
-	icon.id = "telegram-ad-filter-settings";
-	icon.textContent = "⚙️";
-	settingsButton.append(ripple);
-	settingsButton.append(icon);
-	settingsButton.addEventListener("click", (event) => {
-		event.stopPropagation();
-		callback();
-	});
-	element.append(settingsButton);
-}
-function handleSponsoredMessage(node) {
-	// Check for various indicators of official Telegram sponsored messages
-	if (node.classList.contains("is-sponsored")) {
-		return true;
-	}
-	if (node.hasAttribute("data-is-sponsored")) {
-		return true;
-	}
-	if (node.classList.contains("sponsored-message")) {
-		return true;
-	}
-	// Check for "Sponsored" text in message
-	const sponsoredLabel = node.querySelector(".sponsored-label, .sponsor-label, [class*=\"sponsor\"]");
-	if (sponsoredLabel && sponsoredLabel.textContent?.toLowerCase().includes("sponsor")) {
-		return true;
-	}
-	// Check message content for sponsored indicators
-	const message = node.querySelector(".message");
-	if (message) {
-		const messageText = message.textContent?.toLowerCase() || "";
-		// Look for common sponsored message patterns
-		if (messageText.includes("sponsored") && node.querySelector(".bubble-content-wrapper")) {
-			return true;
-		}
-	}
-	return false;
-}
-function handleMessageNode(node, adWords) {
-	const message = node.querySelector(".message");
-	if (!message || node.querySelector(".advertisement")) return;
-	// First check if this is an official sponsored message
-	if (handleSponsoredMessage(node)) {
-		node.classList.add("is-sponsored");
-		node.setAttribute("data-is-sponsored", "true");
-		return;
-	}
-	const textContent = message.textContent?.toLowerCase();
-	const links = [...message.querySelectorAll("a")].reduce((acc, { href }) => {
-		if (href) acc.push(href.toLowerCase());
-		return acc;
-	}, []);
-	if (!textContent && !links.length) return;
-	
-	// Find which keyword matched
-	let matchedKeyword = null;
-	const filters = adWords.map((filter) => filter.toLowerCase());
-	for (const filter of filters) {
-		if (textContent?.includes(filter) || links.some((href) => href.includes(filter))) {
-			matchedKeyword = adWords.find(word => word.toLowerCase() === filter);
-			break;
-		}
-	}
-	if (!matchedKeyword) return;
-	
-	const trigger = document.createElement("div");
-	trigger.classList.add("advertisement");
-	trigger.textContent = `Hidden by filter for <${matchedKeyword}>`;
-	node.querySelector(".bubble-content")?.prepend(trigger);
-	node.classList.add("has-advertisement");
-	trigger.addEventListener("click", () => {
-		node.classList.remove("has-advertisement");
-	});
-	message.addEventListener("click", () => {
-		node.classList.add("has-advertisement");
-	});
+
+function isOfficialSponsored(node) {
+  if (
+    node.classList.contains("is-sponsored") ||
+    node.hasAttribute("data-is-sponsored") ||
+    node.classList.contains("sponsored-message")
+  ) return true;
+
+  const label = node.querySelector("[class*='sponsor']");
+  return label?.textContent?.toLowerCase().includes("sponsor");
 }
 
-//#endregion
-//#region src/configs.ts
+function handleMessageNode(node, adWords) {
+  if (!node.classList.contains("bubble")) return;
+  if (node.dataset.adProcessed) return;
+  node.dataset.adProcessed = "1";
+
+  if (isOfficialSponsored(node)) {
+    node.classList.add("is-sponsored");
+    node.dataset.isSponsored = "true";
+    return;
+  }
+
+  const message = node.querySelector(".message");
+  if (!message) return;
+
+  const text = message.textContent?.toLowerCase() || "";
+  const links = [...message.querySelectorAll("a")].map(a => a.href.toLowerCase());
+
+  const keyword = adWords.find(w =>
+    text.includes(w.toLowerCase()) ||
+    links.some(l => l.includes(w.toLowerCase()))
+  );
+
+  if (!keyword) return;
+
+  const trigger = document.createElement("div");
+  trigger.className = "advertisement";
+  trigger.textContent = `Hidden by filter for <${keyword}>`;
+
+  trigger.onclick = () => {
+    node.classList.toggle("has-advertisement");
+  };
+
+  node.querySelector(".bubble-content")?.prepend(trigger);
+  node.classList.add("has-advertisement");
+}
+
 const settingsConfig = {
-	id: "telegram-ad-filter",
-	frameStyle,
-	css: popupStyle,
-	title: "Telegram Ad Filter Settings",
-	fields: { listUrls: {
-		label: "Blacklist URLs (one per line) – each URL must be a publicly accessible JSON file containing an array of blocked words or phrases",
-		type: "textarea",
-		default: "https://raw.githubusercontent.com/jiaweiding/telegram-ad-filter/refs/heads/master/blacklist.json"
-	} }
+  id: "telegram-ad-filter",
+  frameStyle,
+  css: popupStyle,
+  title: "Telegram Ad Filter Settings",
+  fields: {
+    listUrls: {
+      label: "Blacklist URLs (JSON array, one URL per line)",
+      type: "textarea",
+      default:
+        "https://raw.githubusercontent.com/jiaweiding/telegram-ad-filter/refs/heads/master/blacklist.json"
+    }
+  }
 };
 
-//#endregion
-//#region src/fetch.ts
-function isValidURL(payload) {
-	try {
-		if (typeof payload !== "string") return false;
-		const parsedUrl = new URL(payload);
-		return parsedUrl.protocol === "http:" || parsedUrl.protocol === "https:";
-	} catch {
-		return false;
-	}
+function isValidURL(url) {
+  try {
+    const u = new URL(url);
+    return u.protocol === "http:" || u.protocol === "https:";
+  } catch {
+    return false;
+  }
 }
-function isValidJSON(payload) {
-	try {
-		JSON.parse(payload);
-		return true;
-	} catch {
-		return false;
-	}
-}
-async function fetchAndParseJSON(url) {
-	const content = await fetch(url).then((response) => response.text());
-	if (!isValidJSON(content)) throw new SyntaxError(`Invalid JSON: data from ${url}`);
-	return JSON.parse(content);
-}
+
 async function fetchLists(urlsString) {
-	const urls = urlsString.split("\n").map((url) => url.trim()).filter(Boolean);
-	const resultSet = /* @__PURE__ */ new Set();
-	for (const url of urls) {
-		if (!isValidURL(url)) throw new URIError(`Invalid URL: ${url}. Please ensure it leads to an online source like GitHub, Gist, Pastebin, etc.`);
-		try {
-			const parsedData = await fetchAndParseJSON(url);
-			if (!Array.isArray(parsedData)) throw new TypeError(`Invalid array: data from ${url}`);
-			const strings = parsedData.filter((entry) => typeof entry === "string").map((entry) => entry.trim()).filter(Boolean);
-			for (const string of strings) resultSet.add(string);
-		} catch (error) {
-			if (error instanceof SyntaxError) throw error;
-			throw new Error(`Fetch error: ${url}. Please check the URL or your network connection.`);
-		}
-	}
-	return [...resultSet];
+  const urls = urlsString.split("\n").map(u => u.trim()).filter(Boolean);
+  const set = new Set();
+
+  for (const url of urls) {
+    if (!isValidURL(url)) continue;
+    const res = await fetch(url).then(r => r.json());
+    if (Array.isArray(res)) {
+      res.filter(x => typeof x === "string").forEach(x => set.add(x.trim()));
+    }
+  }
+  return [...set];
 }
 
-//#region src/main.ts
 (async () => {
-	GM_addStyle(globalStyles);
-	let adWords = [];
-	const gmc = new GM_configStruct({
-		...settingsConfig,
-		events: {
-			init: async function() {
-				try {
-					adWords = await fetchLists(this.get("listUrls").toString());
-					console.log("[TG Ad Filter] Loaded", adWords.length, "keywords");
-				} catch (error) {
-					console.error("[TG Ad Filter] Failed to load blacklist:", error);
-				}
-			},
-			save: async function() {
-				try {
-					adWords = await fetchLists(this.get("listUrls").toString());
-					this.close();
-				} catch (error) {
-					alert(error instanceof Error ? error.message : String(error));
-				}
-			}
-		}
-	});
-	function walk(node) {
-		if (!(node instanceof HTMLElement) || !node.nodeType) return;
-		let child = null;
-		let next = null;
-		switch (node.nodeType) {
-			case node.ELEMENT_NODE:
-			case node.DOCUMENT_NODE:
-			case node.DOCUMENT_FRAGMENT_NODE:
-				if (node.matches(".chat-utils")) addSettingsButton(node, () => {
-					gmc.open();
-				});
-				if (node.matches(".bubble")) handleMessageNode(node, adWords);
-				child = node.firstChild;
-				while (child) {
-					next = child.nextSibling;
-					walk(child);
-					child = next;
-				}
-				break;
-			case node.TEXT_NODE:
-			default: break;
-		}
-	}
-	function mutationHandler(mutationRecords) {
-		for (const { type, addedNodes } of mutationRecords) if (type === "childList" && typeof addedNodes === "object" && addedNodes.length) for (const node of addedNodes) walk(node);
-	}
-	new MutationObserver(mutationHandler).observe(document, {
-		childList: true,
-		subtree: true,
-		attributeFilter: ["class"]
-	});
-})();
+  GM_addStyle(globalStyles);
 
-//#endregion
+  let adWords = [];
+
+  const gmc = new GM_configStruct({
+    ...settingsConfig,
+    events: {
+      init: async function () {
+        adWords = await fetchLists(this.get("listUrls"));
+      },
+      save: async function () {
+        adWords = await fetchLists(this.get("listUrls"));
+        this.close();
+      }
+    }
+  });
+
+  function walk(node) {
+    if (!(node instanceof HTMLElement)) return;
+
+    if (node.matches(".bubble")) {
+      handleMessageNode(node, adWords);
+    }
+
+    for (const child of node.children) walk(child);
+  }
+
+  new MutationObserver(muts => {
+    for (const m of muts) {
+      m.addedNodes.forEach(walk);
+    }
+  }).observe(document.body, { childList: true, subtree: true });
+})();
