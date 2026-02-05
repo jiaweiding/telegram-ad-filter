@@ -30,8 +30,10 @@ GM_addStyle(`
 .bubble.has-advertisement .attachment,
 .bubble.has-advertisement .message,
 .bubble.has-advertisement replies-element.replies-footer,
-.bubble.has-advertisement .bubble-beside-button.forward {
-  display: none;
+.bubble.has-advertisement .name.floating-part,
+.bubble.has-advertisement .bubble-content .bubble-beside-button.forward,
+.bubble.has-advertisement .bubble-content-wrapper .bubble-beside-button.forward {
+  display: none !important;
 }
 
 /* 提示条 */
@@ -77,11 +79,18 @@ function handleBubble(node, keywords) {
   const text = message.textContent?.toLowerCase() || "";
   const links = [...message.querySelectorAll("a")].map(a => a.href.toLowerCase());
 
+  console.log("[TG Ad Filter] Checking message:", text.substring(0, 100));
+
   const hit = keywords.find(k =>
     text.includes(k) || links.some(l => l.includes(k))
   );
 
-  if (!hit) return;
+  if (!hit) {
+    console.log("[TG Ad Filter] No keyword match found");
+    return;
+  }
+
+  console.log("[TG Ad Filter] Matched keyword:", hit);
 
   const tip = document.createElement("div");
   tip.className = "advertisement";
