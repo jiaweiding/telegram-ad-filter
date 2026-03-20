@@ -5,7 +5,7 @@
 ![prs-welcome][prs-welcome-img]
 [![ask DeepWiki][deep-wiki-img]][deep-wiki-href]
 
-UserScript for [Telegram WebK](https://web.telegram.org/k/) that minimizes messages containing words from the [ad-word list](https://github.com/VChet/telegram-ad-filter/blob/master/blacklist.json).
+UserScript for [Telegram WebK](https://web.telegram.org/k/) and [Telegram WebA](https://web.telegram.org/a/) that minimizes messages containing configured keywords, such as `#AD, xx云`.
 
 ## Preview
 

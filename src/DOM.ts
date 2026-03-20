@@ -1,143 +1,168 @@
+export const MESSAGE_NODE_SELECTOR = ".bubble, .message-list-item, .Message, .SponsoredMessage";
+
+let placeholderId = 0;
+
 export const globalStyles = `
-  .bubble:not(.has-advertisement) .advertisement {
-    display: none;
-  }
-  .bubble.has-advertisement .bubble-content {
-    min-height: auto !important;
-  }
-  .bubble.has-advertisement .bubble-content *:not(.advertisement) {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    padding: 0;
-    margin: -1px;
-    overflow: hidden;
-    clip: rect(0, 0, 0, 0);
-    white-space: nowrap;
-    border: 0;
-  }
-  .bubble.has-advertisement .reply-markup {
-    display: none;
-  }
-  .bubble.is-sponsored,
-  .bubble[data-is-sponsored="true"],
+  .SponsoredMessage,
+  .sponsored-media-preview,
+  [data-telegram-ad-filter-sponsored="true"],
   .sponsored-message {
     display: none !important;
   }
-  .advertisement {
-    padding: 0.5rem 1rem;
-    cursor: pointer;
-    white-space: nowrap;
-    font-style: italic;
-    font-size: var(--messages-text-size);
-    font-weight: var(--font-weight-bold);
-    color: var(--link-color);
-  }
-  #telegram-ad-filter-settings {
-    display: inline-flex;
+  .advertisement-row {
+    display: flex;
     justify-content: center;
-    width: 24px;
-    font-size: 24px;
-    color: transparent;
-    text-shadow: 0 0 var(--secondary-text-color);
-  }
-`;
-
-export const frameStyle = `
-  inset: 115px auto auto 130px;
-  border: 1px solid rgb(0, 0, 0);
-  height: 300px;
-  margin: 0px;
-  max-height: 95%;
-  max-width: 95%;
-  opacity: 1;
-  overflow: auto;
-  padding: 0px;
-  position: fixed;
-  width: 75%;
-  z-index: 9999;
-  display: block;
-`;
-
-export const popupStyle = `
-  #telegram-ad-filter {
-    background: #181818;
-    color: #ffffff;
-  }
-  #telegram-ad-filter textarea {
-    resize: vertical;
     width: 100%;
-    min-height: 150px;
+    margin: 0.375rem 0 0.5rem;
+    pointer-events: auto;
   }
-  #telegram-ad-filter .reset, #telegram-ad-filter .reset a, #telegram-ad-filter_buttons_holder {
-    color: inherit;
+  .advertisement {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    max-width: min(calc(100% - 1rem), 11rem);
+    min-height: 2rem;
+    padding: 0.45rem 0.8rem;
+    border: 0;
+    border-radius: 999px;
+    cursor: pointer;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--color-text-secondary, rgb(112 117 121));
+    background: var(--color-background-compact-menu, rgb(255 255 255 / 86%));
+    box-shadow:
+      0 0.125rem 0.375rem rgb(0 0 0 / 10%),
+      0 0.5rem 1rem rgb(0 0 0 / 8%);
+    text-align: center;
+    backdrop-filter: blur(0.75rem);
+    transition: transform 160ms ease, background-color 160ms ease, color 160ms ease;
+  }
+  .advertisement:hover {
+    transform: translateY(-1px);
+    background: var(--color-background-compact-menu-reactions, rgb(255 255 255 / 94%));
+  }
+  .advertisement:active {
+    transform: translateY(0);
+    background: var(--color-background-compact-menu-hover, rgb(0 0 0 / 0.067));
+  }
+  .advertisement__text {
+    display: inline-flex;
+    align-items: center;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .advertisement__hint {
+    flex: 0 0 auto;
+    color: var(--color-primary, rgb(51 144 236));
+    font-size: 0.75rem;
+    font-weight: 700;
   }
 `;
-
-export function addSettingsButton(element: HTMLElement, callback: Function): void {
-  const settingsButton = document.createElement("button");
-  settingsButton.classList.add("btn-icon", "rp");
-  settingsButton.setAttribute("title", "Telegram Ad Filter Settings");
-
-  const ripple = document.createElement("div");
-  ripple.classList.add("c-ripple");
-  const icon = document.createElement("span");
-  icon.id = "telegram-ad-filter-settings";
-  icon.textContent = "⚙️";
-  settingsButton.append(ripple);
-  settingsButton.append(icon);
-
-  settingsButton.addEventListener("click", (event) => {
-    event.stopPropagation();
-    callback();
-  });
-
-  element.append(settingsButton);
-}
 
 export function handleSponsoredMessage(node: HTMLElement): boolean {
-  // Check for various indicators of official Telegram sponsored messages
+  if (node.classList.contains("SponsoredMessage")) {
+    return true;
+  }
+
+  if (node.classList.contains("sponsored-media-preview")) {
+    return true;
+  }
+
   if (node.classList.contains("is-sponsored")) {
     return true;
   }
-  
+
   if (node.hasAttribute("data-is-sponsored")) {
     return true;
   }
-  
+
   if (node.classList.contains("sponsored-message")) {
     return true;
   }
-  
-  // Check for "Sponsored" text in message
-  const sponsoredLabel = node.querySelector(".sponsored-label, .sponsor-label, [class*=\"sponsor\"]");
+
+  const sponsoredLabel = node.querySelector([
+    ".sponsored-label",
+    ".sponsor-label",
+    ".ad-about",
+    ".SponsoredMessage__button",
+    ".message-title.message-type",
+    "[class*=\"sponsor\"]",
+    "[class*=\"Sponsored\"]"
+  ].join(", "));
   if (sponsoredLabel && sponsoredLabel.textContent?.toLowerCase().includes("sponsor")) {
     return true;
   }
-  
-  // Check message content for sponsored indicators
-  const message = node.querySelector(".message");
+
+  const typeLabel = node.querySelector(".message-title.message-type");
+  if (typeLabel && typeLabel.textContent?.trim().toLowerCase() === "ad") {
+    return true;
+  }
+
+  const message = getMessageElement(node);
   if (message) {
     const messageText = message.textContent?.toLowerCase() || "";
-    // Look for common sponsored message patterns
-    if (messageText.includes("sponsored") && node.querySelector(".bubble-content-wrapper")) {
+    if (messageText.includes("sponsored") || messageText.includes("what's this?")) {
       return true;
     }
   }
-  
+
   return false;
 }
 
-export function handleMessageNode(node: HTMLElement, adWords: string[]): void {
-  const message = node.querySelector(".message");
-  if (!message || node.querySelector(".advertisement")) { return; }
+function getMessageElement(node: HTMLElement): HTMLElement | null {
+  return node.querySelector<HTMLElement>([
+    ".message",
+    ".text-content",
+    ".WebPage-text",
+    ".translatable-message",
+    ".message-content",
+    "[class*=\"message-content\"]"
+  ].join(", "));
+}
 
-  // First check if this is an official sponsored message
+function getPlaceholderSelector(node: HTMLElement): string | null {
+  const nodeId = node.dataset.telegramAdFilterNodeId;
+  if (!nodeId) { return null; }
+  return `[data-telegram-ad-filter-placeholder-for="${nodeId}"]`;
+}
+
+function getOrAssignNodeId(node: HTMLElement): string {
+  if (!node.dataset.telegramAdFilterNodeId) {
+    placeholderId += 1;
+    node.dataset.telegramAdFilterNodeId = String(placeholderId);
+  }
+
+  return node.dataset.telegramAdFilterNodeId;
+}
+
+export function resetMessageNode(node: HTMLElement): void {
+  const placeholderSelector = getPlaceholderSelector(node);
+  if (placeholderSelector) {
+    node.parentElement?.querySelectorAll(placeholderSelector).forEach((element) => {
+      element.remove();
+    });
+  }
+
+  delete node.dataset.telegramAdFilterCollapsed;
+  delete node.dataset.telegramAdFilterSponsored;
+  delete node.dataset.telegramAdFilterRevealed;
+
+  node.style.removeProperty("display");
+}
+
+export function handleMessageNode(node: HTMLElement, adWords: string[]): void {
+  if (getPlaceholderSelector(node) && node.parentElement?.querySelector(getPlaceholderSelector(node) ?? "")) { return; }
+
   if (handleSponsoredMessage(node)) {
-    node.classList.add("is-sponsored");
-    node.setAttribute("data-is-sponsored", "true");
+    node.dataset.telegramAdFilterSponsored = "true";
     return;
   }
+
+  const message = getMessageElement(node);
+  if (!message) { return; }
 
   const textContent = message.textContent?.toLowerCase();
   const links = [...message.querySelectorAll("a")].reduce((acc: string[], { href }) => {
@@ -146,7 +171,6 @@ export function handleMessageNode(node: HTMLElement, adWords: string[]): void {
   }, []);
   if (!textContent && !links.length) { return; }
 
-  // Find which keyword matched
   let matchedKeyword: string | null = null;
   const filters = adWords.map((filter) => filter.toLowerCase());
   for (const filter of filters) {
@@ -157,12 +181,46 @@ export function handleMessageNode(node: HTMLElement, adWords: string[]): void {
   }
   if (!matchedKeyword) { return; }
 
-  const trigger = document.createElement("div");
-  trigger.classList.add("advertisement");
-  trigger.textContent = `Hidden by filter for <${matchedKeyword}>`;
-  node.querySelector(".bubble-content")?.prepend(trigger);
+  const parent = node.parentElement;
+  if (!parent) { return; }
 
-  node.classList.add("has-advertisement");
-  trigger.addEventListener("click", () => { node.classList.remove("has-advertisement"); });
-  message.addEventListener("click", () => { node.classList.add("has-advertisement"); });
+  const nodeId = getOrAssignNodeId(node);
+  const row = document.createElement("div");
+  row.className = "advertisement-row";
+  row.dataset.telegramAdFilterPlaceholderFor = nodeId;
+
+  const trigger = document.createElement("button");
+  trigger.classList.add("advertisement");
+  trigger.dataset.telegramAdFilterTrigger = "true";
+  trigger.type = "button";
+  trigger.title = `Toggle filtered message: ${matchedKeyword}`;
+  trigger.setAttribute("aria-label", `Toggle filtered message: ${matchedKeyword}`);
+
+  const text = document.createElement("span");
+  text.className = "advertisement__text";
+  text.textContent = `Filtered by ${matchedKeyword}`;
+
+  const hint = document.createElement("span");
+  hint.className = "advertisement__hint";
+  const applyFilteredState = (revealed: boolean): void => {
+    node.dataset.telegramAdFilterRevealed = revealed ? "true" : "false";
+    node.dataset.telegramAdFilterCollapsed = revealed ? "false" : "true";
+    hint.textContent = revealed ? "Hide" : "Show";
+
+    if (revealed) {
+      node.style.removeProperty("display");
+      return;
+    }
+
+    node.style.setProperty("display", "none", "important");
+  };
+
+  trigger.append(text, hint);
+  row.append(trigger);
+  parent.insertBefore(row, node);
+
+  applyFilteredState(false);
+  trigger.addEventListener("click", () => {
+    applyFilteredState(node.dataset.telegramAdFilterRevealed !== "true");
+  });
 }

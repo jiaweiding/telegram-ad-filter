@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         Telegram Ad Filter
-// @version      1.5.0
+// @version      1.6.14
 // @description  Removes official Telegram sponsored messages and collapses messages that contain words from the ad-word list
 // @license      MIT
 // @author       VChet
@@ -8,10 +8,7 @@
 // @namespace    telegram-ad-filter
 // @match        https://web.telegram.org/k/*
 // @match        https://web.telegram.org/a/*
-// @require      https://openuserjs.org/src/libs/sizzle/GM_config.js
 // @grant        GM_addStyle
-// @grant        GM_getValue
-// @grant        GM_setValue
 // @homepage     https://github.com/VChet/telegram-ad-filter
 // @homepageURL  https://github.com/VChet/telegram-ad-filter
 // @supportURL   https://github.com/VChet/telegram-ad-filter

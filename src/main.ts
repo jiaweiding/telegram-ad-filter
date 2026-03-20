@@ -1,47 +1,33 @@
-import { addSettingsButton, globalStyles, handleMessageNode } from "./DOM";
-import { settingsConfig } from "./configs";
-import { fetchLists } from "./fetch";
+import {
+  globalStyles,
+  handleMessageNode,
+  MESSAGE_NODE_SELECTOR,
+  resetMessageNode
+} from "./DOM";
+import { fetchKeywordList } from "./fetch";
 
 (async() => {
   GM_addStyle(globalStyles);
 
   let adWords: string[] = [];
-  const gmc = new GM_configStruct({
-    ...settingsConfig,
-    events: {
-      init: async function() { adWords = await fetchLists(this.get("listUrls").toString()); },
-      save: async function() {
-        try {
-          adWords = await fetchLists(this.get("listUrls").toString());
-          this.close();
-        } catch (error) {
-          alert(error instanceof Error ? error.message : String(error));
-        }
-      }
-    }
-  });
+
+  const refreshPage = (): void => {
+    document.querySelectorAll<HTMLElement>(MESSAGE_NODE_SELECTOR).forEach((element) => {
+      resetMessageNode(element);
+      handleMessageNode(element, adWords);
+    });
+  };
 
   function walk(node: Node): void {
-    if (!(node instanceof HTMLElement) || !node.nodeType) { return; }
-    let child = null;
-    let next = null;
-    switch (node.nodeType) {
-      case node.ELEMENT_NODE:
-      case node.DOCUMENT_NODE:
-      case node.DOCUMENT_FRAGMENT_NODE:
-        if (node.matches(".chat-utils")) { addSettingsButton(node, () => { gmc.open(); }); }
-        if (node.matches(".bubble")) { handleMessageNode(node, adWords); }
-        child = node.firstChild;
-        while (child) {
-          next = child.nextSibling;
-          walk(child);
-          child = next;
-        }
-        break;
-      case node.TEXT_NODE:
-      default:
-        break;
+    if (!(node instanceof HTMLElement)) { return; }
+
+    if (node.matches(MESSAGE_NODE_SELECTOR)) {
+      handleMessageNode(node, adWords);
     }
+
+    node.querySelectorAll<HTMLElement>(MESSAGE_NODE_SELECTOR).forEach((element) => {
+      handleMessageNode(element, adWords);
+    });
   }
 
   function mutationHandler(mutationRecords: MutationRecord[]): void {
@@ -53,5 +39,14 @@ import { fetchLists } from "./fetch";
   }
 
   const observer = new MutationObserver(mutationHandler);
-  observer.observe(document, { childList: true, subtree: true, attributeFilter: ["class"] });
+  const root = document.body ?? document.documentElement;
+  observer.observe(root, { childList: true, subtree: true });
+  walk(root);
+
+  try {
+    adWords = await fetchKeywordList();
+    refreshPage();
+  } catch (error) {
+    console.error("[Telegram Ad Filter]", error);
+  }
 })();
