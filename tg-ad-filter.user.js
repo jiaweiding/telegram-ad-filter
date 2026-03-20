@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         Telegram Ad Filter
-// @version      1.6.14
+// @version      1.6.16
 // @description  Removes official Telegram sponsored messages and collapses messages that contain words from the ad-word list
 // @license      MIT
 // @author       VChet
@@ -32,7 +32,7 @@ const globalStyles = `
   }
   .advertisement-row {
     display: flex;
-    justify-content: center;
+    justify-content: flex-start;
     width: 100%;
     margin: 0.375rem 0 0.5rem;
     pointer-events: auto;
@@ -40,9 +40,10 @@ const globalStyles = `
   .advertisement {
     display: inline-flex;
     align-items: center;
-    justify-content: center;
+    justify-content: space-between;
     gap: 0.5rem;
-    max-width: min(calc(100% - 1rem), 11rem);
+    width: min(calc(100% - 1rem), 24rem);
+    max-width: min(calc(100% - 1rem), 24rem);
     min-height: 2rem;
     padding: 0.45rem 0.8rem;
     border: 0;
@@ -70,10 +71,12 @@ const globalStyles = `
   .advertisement__text {
     display: inline-flex;
     align-items: center;
+    flex: 1 1 auto;
     min-width: 0;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    text-align: left;
   }
   .advertisement__hint {
     flex: 0 0 auto;
@@ -239,6 +242,7 @@ function handleMessageNode(node, adWords) {
   const text = document.createElement("span");
   text.className = "advertisement__text";
   text.textContent = `Filtered by ${matchedKeyword}`;
+  text.title = matchedKeyword;
 
   const hint = document.createElement("span");
   hint.className = "advertisement__hint";

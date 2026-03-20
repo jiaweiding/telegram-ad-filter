@@ -11,7 +11,7 @@ export const globalStyles = `
   }
   .advertisement-row {
     display: flex;
-    justify-content: center;
+    justify-content: flex-start;
     width: 100%;
     margin: 0.375rem 0 0.5rem;
     pointer-events: auto;
@@ -19,9 +19,10 @@ export const globalStyles = `
   .advertisement {
     display: inline-flex;
     align-items: center;
-    justify-content: center;
+    justify-content: space-between;
     gap: 0.5rem;
-    max-width: min(calc(100% - 1rem), 11rem);
+    width: min(calc(100% - 1rem), 24rem);
+    max-width: min(calc(100% - 1rem), 24rem);
     min-height: 2rem;
     padding: 0.45rem 0.8rem;
     border: 0;
@@ -49,10 +50,12 @@ export const globalStyles = `
   .advertisement__text {
     display: inline-flex;
     align-items: center;
+    flex: 1 1 auto;
     min-width: 0;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    text-align: left;
   }
   .advertisement__hint {
     flex: 0 0 auto;
@@ -199,6 +202,7 @@ export function handleMessageNode(node: HTMLElement, adWords: string[]): void {
   const text = document.createElement("span");
   text.className = "advertisement__text";
   text.textContent = `Filtered by ${matchedKeyword}`;
+  text.title = matchedKeyword;
 
   const hint = document.createElement("span");
   hint.className = "advertisement__hint";
